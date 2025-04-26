@@ -10,6 +10,7 @@ import re  # 新增导入re模块
 sys.path.append('..')
 from base.spider import Spider
 
+
 class Spider(Spider):
     def getName(self):
         return "Litv"
@@ -50,7 +51,7 @@ class Spider(Spider):
     def liveContent(self, url):
         # 初始化默认M3U内容（至少包含EXTM3U声明）
         a = ['#EXTM3U']
-        
+
         try:
             base_url = "https://kzb29rda.com/prod-api/iptv/getIptvList?liveType=0&deviceType=1"
             response = requests.get(base_url)
@@ -65,7 +66,7 @@ class Spider(Spider):
 
             channels = [
                 element
-                #for item in data.get('list', [])
+                # for item in data.get('list', [])
                 for item in sorted_list
                 for element in (
                     f'#EXTINF:-1 tvg-id="{item["play_source_name"]}" tvg-name="{item["play_source_name"]}" '
@@ -115,6 +116,7 @@ class Spider(Spider):
         if params['type'] == "ts":
             return self.get_ts(params)
         return [302, "text/plain", None, {'Location': 'https://sf1-cdn-tos.huoshanstatic.com/obj/media-fe/xgplayer_doc_video/mp4/xgplayer-demo-720p.mp4'}]
+
     def proxyM3u8(self, params):
         pid = params['pid']
         info = pid.split(',')
@@ -149,12 +151,21 @@ class Spider(Spider):
     def b64decode(self, data):
         return base64.b64decode(data.encode('utf-8')).decode('utf-8')
 
+
 def main():
     spider = Spider()
     result = spider.liveContent("")
-    output_path = "output/live.m3u"  # 指定输出目录和文件名
-    with open(output_path, 'w', encoding='utf-8') as f:
+    output_m3u_path = "output/live.m3u"  # 指定输出m3u文件的目录和文件名
+    output_txt_path = "output/live.txt"  # 指定输出txt文件的目录和文件名
+
+    # 写入m3u文件
+    with open(output_m3u_path, 'w', encoding='utf-8') as f:
         f.write(result)
+
+    # 写入txt文件
+    with open(output_txt_path, 'w', encoding='utf-8') as f:
+        f.write(result)
+
 
 if __name__ == '__main__':
     main()
