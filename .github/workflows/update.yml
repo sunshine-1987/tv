@@ -1,0 +1,37 @@
+name: Update Live Content
+
+on:
+  schedule:
+    - cron: '0 0 */2 * *'  # 每两天执行一次
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Install dependencies
+        run: |
+          pip install requests
+
+      - name: Run script
+        run: python 快直播py/kzb.py
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add output/live.m3u
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Update live content"
+            git push
+          fi
