@@ -28,7 +28,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add output/live.m3u
+          git add output/live.m3u output/live.txt
           if git diff --staged --quiet; then
             echo "No changes to commit."
           else
