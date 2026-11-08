@@ -2,9 +2,9 @@ name: 生成直播源 zb.txt
 
 on:
   schedule:
-    # 每 2 小时运行一次（GitHub 的 cron 用 UTC，固定 2 小时间隔不受时区影响）
-    - cron: "0 */2 * * *"
-  workflow_dispatch:        # 也可以在网页上手动点一次
+    # 每 1 小时运行一次（GitHub 的 cron 用 UTC，整点触发，实际可能有几分钟延迟）
+    - cron: "0 * * * *"
+  workflow_dispatch:        # 支持在 Actions 页面手动运行
 
 permissions:
   contents: write           # 允许工作流把 zb.txt 提交回仓库
@@ -92,22 +92,30 @@ jobs:
 
           tv_lines = to_lines(fetch(TV_URL))
 
+          # (源文件里的分组标题, 输出到 zb.txt 的分组标题)
+          # 央视那一组：源文件叫 央视·省流 或 央视·咪咕 都认，统一输出为 央视·咪咕
+          # 卫视那一组：源文件叫 卫视频道 或 卫视·咪咕 都认，统一输出为 卫视·咪咕
+          GROUP_CCTV = ("央视·省流,#genre#", "央视·咪咕,#genre#")
+          GROUP_WS = ("卫视频道,#genre#", "卫视·咪咕,#genre#")
+          OUT_CCTV = "央视·咪咕,#genre#"
+          OUT_WS = "卫视·咪咕,#genre#"
+
           live_blocks = split_blocks(to_lines(fetch(LIVE_URL)))
           live_out = []
           for header, items in live_blocks:
-              if header == "央视·省流,#genre#":
+              if header in GROUP_CCTV:
                   if items:
-                      live_out.append(header)
+                      live_out.append(OUT_CCTV)
                       live_out.extend(items)
-              elif header == "卫视频道,#genre#":
+              elif header in GROUP_WS:
                   # 只保留 http://gslbmgsplive.miguvideo.com/migu/ 开头的线路
                   kept = [x for x in items if is_migu(x)]
                   if kept:
-                      live_out.append(header)
+                      live_out.append(OUT_WS)
                       live_out.extend(kept)
 
           if not live_out:
-              raise SystemExit("live.txt 里没有取到任何 央视·省流 / 卫视频道(migu) 内容，已中止")
+              raise SystemExit("live.txt 里没有取到任何 央视·咪咕 / 卫视·咪咕 内容，已中止")
 
           tz = timezone(timedelta(hours=8))
           stamp = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
