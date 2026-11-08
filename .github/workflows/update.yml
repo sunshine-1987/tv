@@ -1,8 +1,8 @@
 name: Generate Live File
 on:
   schedule:
-    - cron: '0 */12 * * *'   # 每 12 小时（UTC 0:00 / 12:00）
-  workflow_dispatch:          # 支持手动触发
+    - cron: '0 */12 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: write
