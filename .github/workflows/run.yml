@@ -1,0 +1,143 @@
+name: 生成直播源 zb.txt
+
+on:
+  schedule:
+    # 每 2 小时运行一次（GitHub 的 cron 用 UTC，固定 2 小时间隔不受时区影响）
+    - cron: "0 */2 * * *"
+  workflow_dispatch:        # 也可以在网页上手动点一次
+
+permissions:
+  contents: write           # 允许工作流把 zb.txt 提交回仓库
+
+concurrency:
+  group: build-zb
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 生成 zb.txt
+        run: |
+          python3 - <<'PY'
+          import time
+          import urllib.request
+          from datetime import datetime, timedelta, timezone
+          from pathlib import Path
+
+          TV_URL = "https://gitee.com/hutusheng/tv/raw/master/tv.txt"
+          LIVE_URL = "https://raw.githubusercontent.com/djshxjsh233/migu/main/live.txt"
+          MIGU_PREFIX = "http://gslbmgsplive.miguvideo.com/migu/"
+          OUT_FILE = Path("zb.txt")
+          SEP = "---------分割线---------"
+
+
+          def fetch(url, retries=3):
+              """带重试的下载，gitee / github 偶尔会抽风"""
+              headers = {
+                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+                  "Cache-Control": "no-cache",
+              }
+              last_err = None
+              for i in range(retries):
+                  try:
+                      req = urllib.request.Request(url, headers=headers)
+                      with urllib.request.urlopen(req, timeout=30) as resp:
+                          return resp.read().decode("utf-8-sig", "ignore")
+                  except Exception as e:
+                      last_err = e
+                      print("下载失败（第 %d 次）：%s" % (i + 1, e), flush=True)
+                      if i < retries - 1:
+                          time.sleep(5)
+              raise SystemExit("下载失败：%s -> %s" % (url, last_err))
+
+
+          def to_lines(text):
+              """统一换行符，去掉空行和行尾空白"""
+              text = text.replace("\r\n", "\n").replace("\r", "\n")
+              lines = [ln.rstrip() for ln in text.split("\n")]
+              while lines and not lines[-1]:
+                  lines.pop()
+              return [ln for ln in lines if ln]
+
+
+          def split_blocks(lines):
+              """按 xxx,#genre# 切成若干分组"""
+              blocks = []
+              current = None
+              for line in lines:
+                  s = line.strip()
+                  if s.endswith("#genre#"):
+                      current = [s, []]
+                      blocks.append(current)
+                      continue
+                  if current is not None:
+                      current[1].append(s)
+              return blocks
+
+
+          def is_migu(line):
+              """判断这一行的地址是不是 miguvideo 线路"""
+              parts = line.split(",", 1)
+              if len(parts) < 2:
+                  return False
+              # 多线路用 # 分隔时，任意一条以 migu 开头也算
+              first_url = parts[1].split("#")[0].strip()
+              return first_url.startswith(MIGU_PREFIX)
+
+
+          tv_lines = to_lines(fetch(TV_URL))
+
+          live_blocks = split_blocks(to_lines(fetch(LIVE_URL)))
+          live_out = []
+          for header, items in live_blocks:
+              if header == "央视·省流,#genre#":
+                  if items:
+                      live_out.append(header)
+                      live_out.extend(items)
+              elif header == "卫视频道,#genre#":
+                  # 只保留 http://gslbmgsplive.miguvideo.com/migu/ 开头的线路
+                  kept = [x for x in items if is_migu(x)]
+                  if kept:
+                      live_out.append(header)
+                      live_out.extend(kept)
+
+          if not live_out:
+              raise SystemExit("live.txt 里没有取到任何 央视·省流 / 卫视频道(migu) 内容，已中止")
+
+          tz = timezone(timedelta(hours=8))
+          stamp = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
+
+          out = [
+              "# 更新时间：%s（北京时间 UTC+8）" % stamp,
+              "# 数据来源：%s | %s" % (TV_URL, LIVE_URL),
+              "",
+          ]
+          # tv.txt 自己末尾可能已经有分割线，先去掉，保证全文件只有一条
+          while tv_lines and "分割线" in tv_lines[-1]:
+              tv_lines.pop()
+
+          out.extend(tv_lines)
+          out.append(SEP)
+          out.extend(live_out)
+
+          OUT_FILE.write_text("\n".join(out) + "\n", encoding="utf-8")
+          print("已写入 %s：tv 部分 %d 行，live 部分 %d 行，总计 %d 行"
+                % (OUT_FILE, len(tv_lines), len(live_out), len(out)))
+          PY
+
+      - name: 提交并推送 zb.txt
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add zb.txt
+          if git diff --cached --quiet; then
+            echo "zb.txt 没有变化，跳过提交"
+          else
+            git commit -m "更新 zb.txt $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            git push
+          fi
