@@ -1,4 +1,4 @@
-# 更新时间：2026-11-08 23:54:19（北京时间 UTC+8）
+# 更新时间：2026-11-09 00:24:44（北京时间 UTC+8）
 # 数据来源：https://gitee.com/hutusheng/tv/raw/master/tv.txt | https://raw.githubusercontent.com/djshxjsh233/migu/main/live.txt
 
 ❤️地址标记,https://gitee.com/hutusheng/tv/raw/master/tv.txt
