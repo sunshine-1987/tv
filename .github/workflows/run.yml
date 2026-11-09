@@ -1,25 +1,20 @@
 name: 生成直播源 zb.txt / zb1.txt
-
 on:
   schedule:
-    # 每 1 小时运行一次（GitHub 的 cron 用 UTC，整点触发，实际可能有几分钟延迟）
-    - cron: "0 * * * *"
+    # UTC 每小时10分、50分触发，间隔40分钟，避开整点队列拥堵
+    - cron: "10,50 * * * *"
   workflow_dispatch:        # 支持在 Actions 页面手动运行
-
 permissions:
   contents: write           # 允许工作流把 zb.txt / zb1.txt 提交回仓库
-
 concurrency:
   group: build-zb
   cancel-in-progress: false
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: 检出仓库
         uses: actions/checkout@v4
-
       - name: 生成 zb.txt 和 zb1.txt
         run: |
           python3 - <<'PY'
@@ -28,25 +23,20 @@ jobs:
           import urllib.request
           from datetime import datetime, timedelta, timezone
           from pathlib import Path
-
           TV_URL = "https://gitee.com/hutusheng/tv/raw/master/tv.txt"
           LIVE_URL = "https://raw.githubusercontent.com/djshxjsh233/migu/main/live.txt"
           MIGU_PREFIX = "http://gslbmgsplive.miguvideo.com/migu/"
           OUT_ZB = Path("zb.txt")
           OUT_ZB1 = Path("zb1.txt")
           SEP = "---------分割线---------"
-
           # live.txt 里要的两组：(分组标题, 输出到 zb.txt 的标题)；源文件标题写作 央视·省流/央视·咪咕、卫视频道/卫视·咪咕 都认
           GROUP_CCTV = ("央视·省流,#genre#", "央视·咪咕,#genre#")
           GROUP_WS = ("卫视频道,#genre#", "卫视·咪咕,#genre#")
           OUT_CCTV = "央视·咪咕,#genre#"
           OUT_WS = "卫视·咪咕,#genre#"
-
           # tv.txt 里的两个骨架分组（zb1.txt 用）
           SEC_CCTV = "📺央视,#genre#"
           SEC_WS = "📺卫视,#genre#"
-
-
           def fetch(url, retries=3):
               """带重试的下载"""
               headers = {
@@ -66,8 +56,6 @@ jobs:
                       if i < retries - 1:
                           time.sleep(5)
               raise SystemExit("下载失败：%s -> %s" % (url, last_err))
-
-
           def to_lines(text):
               """统一换行、去空行、去行尾空白"""
               text = text.replace("\r\n", "\n").replace("\r", "\n")
@@ -75,8 +63,6 @@ jobs:
               while lines and not lines[-1]:
                   lines.pop()
               return [ln for ln in lines if ln]
-
-
           def split_blocks(lines):
               """按 xxx,#genre# 切分组，返回 [(标题, [条目...]), ...]"""
               blocks = []
@@ -90,20 +76,14 @@ jobs:
                   if current is not None:
                       current[1].append(s)
               return blocks
-
-
           def first_url(line):
               parts = line.split(",", 1)
               if len(parts) < 2:
                   return None
               return parts[1].split("#")[0].strip()
-
-
           def is_migu(line):
               u = first_url(line)
               return bool(u) and u.startswith(MIGU_PREFIX)
-
-
           def canon(name):
               """台标归一化：CCTV-1 综合 -> CCTV1；内蒙古卫视 -> 内蒙卫视"""
               s = name.strip().replace(" ", "").replace("　", "")
@@ -116,12 +96,9 @@ jobs:
                   base = {"内蒙": "内蒙古"}.get(base, base)
                   return base + "卫视"
               return s
-
-
           # ================= 一、生成 zb.txt =================
           tv_lines = to_lines(fetch(TV_URL))
           live_blocks = split_blocks(to_lines(fetch(LIVE_URL)))
-
           live_out = []
           for header, items in live_blocks:
               if header in GROUP_CCTV:
@@ -133,16 +110,12 @@ jobs:
                   if kept:
                       live_out.append(OUT_WS)
                       live_out.extend(kept)
-
           if not live_out:
               raise SystemExit("live.txt 里没有取到任何 央视·咪咕 / 卫视·咪咕 内容，已中止")
-
           tz = timezone(timedelta(hours=8))
           stamp = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
-
           while tv_lines and "分割线" in tv_lines[-1]:
               tv_lines.pop()        # tv.txt 自带的末尾分割线去掉，全文件只留一条
-
           out = [
               "# 更新时间：%s（北京时间 UTC+8）" % stamp,
               "# 数据来源：%s | %s" % (TV_URL, LIVE_URL),
@@ -151,19 +124,16 @@ jobs:
           out.extend(tv_lines)
           out.append(SEP)
           out.extend(live_out)
-
           OUT_ZB.write_text("\n".join(out) + "\n", encoding="utf-8")
           print("已写入 %s：tv 部分 %d 行，live 部分 %d 行，总计 %d 行"
                 % (OUT_ZB, len(tv_lines), len(live_out), len(out)))
-
           # ================= 二、生成 zb1.txt =================
           # 保留 tv.txt 的全部分组；只把 📺央视 / 📺卫视 用咪咕线路整理：
           #   - 咪咕线路放每个台标的第一条源，其余源用 # 连接
           #   - live 里 tv 没有的台标（老故事等）进 其他,#genre#
           #   - live 卫视里 tv 没有的（三沙卫视等）追加到 📺卫视 末尾
-          #   - 河北卫视 补全咪咕后，☘️河北 保留 1 条，📺卫视 首位再放 1 条
+          #   - 河北卫视 补全咪咕后，☘️河北 保留 1 条，📺卫视 里放首位再放 1 条
           tv_blocks = split_blocks(tv_lines)
-
           cctv_live, ws_live = [], []
           for header, items in live_blocks:
               if header not in GROUP_CCTV and header not in GROUP_WS:
@@ -178,7 +148,6 @@ jobs:
                           ws_live.append((name, url))
                   else:
                       cctv_live.append((name, url))
-
           # tv 全部台标（判断 live 里的台标 tv 有没有）
           tv_names, tv_line_map = set(), {}
           for header, items in tv_blocks:
@@ -189,7 +158,6 @@ jobs:
                   k = canon(parts[0])
                   tv_names.add(k)
                   tv_line_map.setdefault(k, (parts[0].strip(), parts[1].strip()))
-
           migu_index = {}           # 台标 -> 咪咕线路（同一台标只取第一条，避免 CCTV-4 欧洲/美洲 抢走中文国际）
           other_entries = []        # 进 其他,#genre#
           ws_append = []            # 追加到 📺卫视 末尾
@@ -207,14 +175,12 @@ jobs:
                   migu_index[k] = url
               else:
                   ws_append.append((name, url))
-
           def get_migu(name, urls):
               """把咪咕线路放到第一条，返回 (新url串, 是否注入)"""
               u = migu_index.get(canon(name))
               if u and u not in urls:
                   return u + "#" + urls, True
               return urls, False
-
           merged_blocks = []
           hit = 0
           for header, items in tv_blocks:
@@ -246,39 +212,34 @@ jobs:
                           names_here.add(canon(name))
               if merged[1:]:
                   merged_blocks.append(merged)
-
           if other_entries:                        # 老故事、发现之旅、中学生 等
               other_block = ["其他,#genre#"]
               seen = set()
               for name, url in other_entries:
-                  if name in seen:          # 按原始台标名去重（CCTV-4 欧洲/美洲 要各自保留）
+                  if name in seen:          # 按原始台标名去重（CCTV‑4 欧洲/美洲 要各自保留）
                       continue
                   seen.add(name)
                   other_block.append("%s,%s" % (name, url))
               merged_blocks.append(other_block)
-
           if not merged_blocks:
               raise SystemExit("tv.txt 里没找到 📺央视 / 📺卫视 分组，zb1.txt 未生成")
-
           out1 = ["# 更新时间：%s（北京时间 UTC+8）" % stamp, ""]
           for i, block in enumerate(merged_blocks):
               if i:
                   out1.append("")
               out1.extend(block)
-
-          OUT_ZB1.write_text("\n".join(out1) + "\n", encoding="utf-8")
+          OUT_ZB1.write_text("\n".join(out1) + "\n", encoding="utf‑8")
           print("已写入 %s：%d 个分组，%d 个台标注入咪咕线路，其他 %d 条"
                 % (OUT_ZB1, len(merged_blocks), hit, len(other_entries)))
           PY
-
       - name: 提交并推送
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github‑actions[bot]"
+          git config user.email "41898282+github‑actions[bot]@users.noreply.github.com"
           git add zb.txt zb1.txt
           if git diff --cached --quiet; then
             echo "内容没有变化，跳过提交"
           else
-            git commit -m "更新 zb.txt / zb1.txt $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            git commit -m "更新 zb.txt / zb1.txt $(date -u '+%Y‑%m‑%d %H:%M:%S UTC')"
             git push
           fi
