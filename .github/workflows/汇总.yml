@@ -2,7 +2,7 @@ name: 汇总直播源
 on:
   workflow_dispatch: # 手动触发
   schedule:
-    - cron: '0 3 * * *' # 每日凌晨3点自动跑，UTC时间，对应国内上午11点
+    - cron: '30 3 * * *' # UTC 03:30 = 北京时间 11:30
 
 jobs:
   run:
