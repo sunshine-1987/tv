@@ -1,0 +1,29 @@
+name: 汇总直播源
+on:
+  workflow_dispatch: # 手动触发
+  schedule:
+    - cron: '0 3 * * *' # 每日凌晨3点自动跑，UTC时间，对应国内上午11点
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取仓库代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 安装Python依赖
+        run: |
+          python3 -m pip install requests
+
+      - name: 执行汇总脚本
+        run: python3 merge.py
+
+      - name: 提交更新文件
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add zb3.txt 源库.txt
+          git diff --quiet && git diff --staged --quiet || git commit -m "auto update source"
+          git push
