@@ -10,19 +10,22 @@ OUTPUT_FILE = "zb3.txt"
 TIMEOUT_FETCH = 10
 TIMEOUT_FAIL = 15
 
-# 白名单频道，只保留这些台
+# 白名单频道
 CCTV_LIST = [
     "CCTV1", "CCTV2", "CCTV3", "CCTV4", "CCTV5", "CCTV5+",
     "CCTV6", "CCTV7", "CCTV8", "CCTV9", "CCTV10", "CCTV11",
     "CCTV12", "CCTV13", "CCTV14", "CCTV15", "CCTV16", "CCTV17",
     "CCTV老故事", "CCTV中学生"
 ]
-KID_LIST = ["优漫卡通", "卡酷少儿", "嘉佳卡通"]
+# 补齐你要求的少儿频道
+KID_LIST = [
+    "卡酷少儿", "金鹰卡通", "优漫卡通", "黑莓动画", "睛彩青少", "炫动卡通", "嘉佳卡通"
+]
 MOVIE_LIST = [
     "经典香港电影", "抗战经典影片", "新片放映厅",
     "CHC影迷电影", "CHC动作电影", "CHC家庭影院"
 ]
-# 卫视正则：匹配 【XX卫视】
+# 卫视正则：匹配 XX卫视
 REG_PROV = re.compile(r".+卫视$")
 
 # 分组容器: key=频道名, value=链接集合
@@ -70,7 +73,7 @@ def parse_csv(text):
         line = line.strip()
         if not line or "#" in line:
             continue
-        if "," in line and line.startswith("http") is False:
+        if "," in line and not line.startswith("http"):
             sp = line.split(",", 1)
             if len(sp) == 2:
                 n, u = sp[0].strip(), sp[1].strip()
