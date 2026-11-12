@@ -6,8 +6,8 @@ import html
 
 # ===================== 配置区 =====================
 MAIN_RAW_URL = "https://raw.githubusercontent.com/sunshine-1987/tv/refs/heads/main/源库.txt"
-LOCAL_SRC_FILE = "源库.txt"
 OUTPUT_FILE = "zb3.txt"
+FAIL_FILE = "失效源.txt"
 TIMEOUT_FETCH = 10
 TIMEOUT_FAIL = 15
 
@@ -48,12 +48,6 @@ WEISHI_ALIAS = {
     "旅游卫视": "海南卫视",
     "海南卫视hd": "海南卫视"
 }
-
-# 频道映射：原始名称 → 标准名称
-NAME_MAP = {}
-# 自动填充卫视别名到映射表
-for raw, std in WEISHI_ALIAS.items():
-    NAME_MAP[raw] = std
 
 chan_map = defaultdict(set)
 fail_urls = []
@@ -154,50 +148,56 @@ def is_keep(std_name: str) -> bool:
 
 # ===================== 主逻辑 =====================
 def main():
+    print(f"开始拉取源库：{MAIN_RAW_URL}")
     src_text = fetch_text(MAIN_RAW_URL)
     if src_text is None:
         print("源库.txt 拉取失败！")
         return
     lines = src_text.splitlines()
+    print(f"源库一共读取 {len(lines)} 行")
+
     section = None
     migu_urls = []
     other_urls = []
-    rest_lines = []
 
     for l in lines:
         ll = l.strip()
         if ll == "#咪咕源":
             section = "migu"
-            rest_lines.append(l)
+            print("✅ 进入 #咪咕源 分区")
             continue
         if ll == "#其他代理源":
             section = "other"
-            rest_lines.append(l)
+            print("✅ 进入 #其他代理源 分区")
             continue
         if ll == "#失效源":
             section = "fail"
-            rest_lines.append(l)
+            print("✅ 进入 #失效源 分区，此分区链接不再抓取")
             continue
+
         if section == "migu":
             if ll.startswith("http"):
                 migu_urls.append(ll)
-            else:
-                rest_lines.append(l)
+                print(f"👉 读到咪咕源地址：{ll}")
         elif section == "other":
             if ll.startswith("http"):
                 other_urls.append(ll)
-            else:
-                rest_lines.append(l)
-        else:
-            rest_lines.append(l)
+                print(f"👉 读到代理源地址：{ll}")
+
+    print(f"\n==== 汇总读取结果 ====")
+    print(f"咪咕源数量：{len(migu_urls)}，列表：{migu_urls}")
+    print(f"代理源数量：{len(other_urls)}，列表：{other_urls}")
 
     # 遍历咪咕源
     for u in migu_urls:
-        print(f"【咪咕源】正在拉取: {u}")
+        print(f"\n【咪咕源】正在拉取: {u}")
         txt = fetch_text(u)
         if not txt:
+            print(f"❌ {u} 获取内容失败")
             continue
-        items = parse_m3u(txt)
+        print(f"✅ 成功拿到源内容，行数：{len(txt.splitlines())}")
+        items = parse_m3u(txt) + parse_csv(txt)
+        print(f"解析提取频道数量：{len(items)}")
         for raw_name, url in items:
             std = normalize_name(raw_name)
             print(f"原始台名:{raw_name} → 标准:{std}")
@@ -207,17 +207,22 @@ def main():
 
     # 遍历代理源
     for u in other_urls:
-        print(f"【代理源】正在拉取: {u}")
+        print(f"\n【代理源】正在拉取: {u}")
         txt = fetch_text(u)
         if not txt:
+            print(f"❌ {u} 获取内容失败")
             continue
+        print(f"✅ 成功拿到源内容，行数：{len(txt.splitlines())}")
         items = parse_m3u(txt) + parse_csv(txt)
+        print(f"解析提取频道数量：{len(items)}")
         for raw_name, url in items:
             std = normalize_name(raw_name)
             print(f"原始台名:{raw_name} → 标准:{std}")
             if is_keep(std):
                 chan_map[std].add(url)
         time.sleep(2)
+
+    print(f"\n✅ 全部源处理完成，一共收集到频道：{len(chan_map)}")
 
     # 生成 zb3.txt
     out_lines = []
@@ -258,22 +263,11 @@ def main():
         f.write("\n".join(out_lines))
     print(f"\n✅ 已生成 {OUTPUT_FILE}")
 
-    # 回填失效源
-    new_src = []
-    in_fail = False
-    for l in rest_lines:
-        if l.strip() == "#失效源":
-            in_fail = True
-            new_src.append(l)
-            for fu in fail_urls:
-                new_src.append(fu)
-            continue
-        if in_fail:
-            continue
-        new_src.append(l)
-    with open(LOCAL_SRC_FILE, "w", encoding="utf-8") as f:
-        f.write("\n".join(new_src))
-    print(f"✅ 已更新源库.txt，本次失效链接数量：{len(fail_urls)}")
+    # 失效链接单独写入失效源.txt，**不再修改源库.txt**
+    with open(FAIL_FILE, "w", encoding="utf-8") as f:
+        f.write("#失效源\n")
+        f.write("\n".join(fail_urls))
+    print(f"✅ 已生成 {FAIL_FILE}，本次失效链接数量：{len(fail_urls)}")
 
 if __name__ == "__main__":
     main()
