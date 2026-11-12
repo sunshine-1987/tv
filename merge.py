@@ -19,9 +19,9 @@ CCTV_LIST = [
     "CCTV老故事", "CCTV中学生"
 ]
 
-# 少儿清单（固定顺序）
+# 少儿清单（新增：经典动画大集合）
 KID_LIST = [
-    "卡酷少儿", "金鹰卡通", "优漫卡通", "黑莓动画", "睛彩青少", "炫动卡通", "嘉佳卡通"
+    "卡酷少儿", "金鹰卡通", "优漫卡通", "黑莓动画", "睛彩青少", "炫动卡通", "嘉佳卡通", "经典动画大集合"
 ]
 
 # 影视清单
@@ -54,10 +54,10 @@ fail_urls = []
 
 # ===================== 工具函数 =====================
 def normalize_name(raw_name: str) -> str:
-    """台名归一化：解码、去符号、清高清/HD后缀"""
+    """台名归一化：解码、去符号、清高清/HD后缀，不再删除【电影】"""
     name = html.unescape(raw_name.strip())
     name = re.sub(r"[_\-，,、 ]+", "", name)
-    name = re.sub(r"(高清|HD|hd|频道|直播|综合|财经|新闻|综艺|体育|电影|电视剧|科教|戏曲|社会与法|少儿)", "", name)
+    name = re.sub(r"(高清|HD|hd|频道|直播|综合|财经|新闻|综艺|体育|电视剧|科教|戏曲|社会与法|少儿)", "", name)
     name = name.strip()
     # 匹配CCTV
     cctv_match = re.search(r"CCTV\s*(\d+\+?)", name, re.IGNORECASE)
@@ -71,14 +71,14 @@ def normalize_name(raw_name: str) -> str:
         return "CCTV老故事"
     if "CCTV中学生" in name:
         return "CCTV中学生"
+    # 影视优先匹配
+    for movie in MOVIE_LIST:
+        if movie in name:
+            return movie
     # 少儿匹配
     for kid in KID_LIST:
         if kid in name:
             return kid
-    # 影视匹配
-    for movie in MOVIE_LIST:
-        if movie in name:
-            return movie
     # 卫视别名
     lower_n = name.lower()
     if lower_n in WEISHI_ALIAS:
@@ -263,7 +263,7 @@ def main():
         f.write("\n".join(out_lines))
     print(f"\n✅ 已生成 {OUTPUT_FILE}")
 
-    # 失效链接单独写入失效源.txt，**不再修改源库.txt**
+    # 失效链接单独写入失效源.txt，不再修改源库.txt
     with open(FAIL_FILE, "w", encoding="utf-8") as f:
         f.write("#失效源\n")
         f.write("\n".join(fail_urls))
