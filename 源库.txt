@@ -1,13 +1,16 @@
 #咪咕源
-
+http://113.124.186.195:7788
+http://116.52.173.150:1234
+http://175.169.113.102:1234
+http://113.98.11.46:3000
+http://112.85.93.7:7788
+http://116.237.170.51:7788
+http://42.94.209.184:7788
+http://27.22.35.13:7788
+http://mg.cttv.vip
 
 
 #其他代理源
-
-
-
-#失效源
-http://27.22.35.13:7788
 http://tv.305362.xyz/zhth/output/migu.txt
 http://tv.305362.xyz/zhth/output/上海联通.txt
 http://tv.305362.xyz/zhth/output/北京联通.txt
@@ -24,3 +27,9 @@ http://tv.305362.xyz/zhth/output/电影轮播.txt
 http://tv.305362.xyz/zhth/output/郑州联通.txt
 http://tv.305362.xyz/zhth/output/重庆电信.txt
 http://tv.305362.xyz/zhth/output/长沙联通.txt
+
+
+
+#失效源
+
+
